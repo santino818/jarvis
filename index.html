@@ -1,0 +1,382 @@
+```html
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PROJECT JARVIS - Daily Assistant Command Center</title>
+
+  <!-- Typography & Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            appbg: '#12151c',
+            panel: '#1e222d',
+            panelHover: '#252a37',
+            panelBorder: '#2e3445',
+            cyanAccent: '#00f2fe',
+            cyanGlow: 'rgba(0, 242, 254, 0.15)',
+            emeraldAccent: '#10b981',
+            amberAccent: '#f59e0b',
+            rubyAccent: '#ef4444',
+            slateText: '#94a3b8'
+          },
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace']
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Leaflet Maps CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+  <style>
+    /* Clean CSS Custom Styles */
+    body {
+      background-color: #12151c;
+      color: #e2e8f0;
+      font-family: 'Inter', sans-serif;
+    }
+
+    /* Lighting Profiles */
+    .theme-low-glow {
+      --glow-alpha: 0.05;
+      --border-alpha: 0.3;
+    }
+    .theme-standard {
+      --glow-alpha: 0.15;
+      --border-alpha: 0.6;
+    }
+    .theme-stark-glow {
+      --glow-alpha: 0.35;
+      --border-alpha: 0.9;
+    }
+
+    .jarvis-panel {
+      background-color: #1e222d;
+      border: 1px solid rgba(46, 52, 69, var(--border-alpha, 0.6));
+      border-radius: 0.75rem;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    .jarvis-panel:hover {
+      border-color: rgba(0, 242, 254, 0.4);
+    }
+
+    .jarvis-input {
+      background-color: #141720;
+      border: 1px solid #2e3445;
+      color: #f8fafc;
+      border-radius: 0.5rem;
+      transition: all 0.2s ease;
+    }
+    .jarvis-input:focus {
+      outline: none;
+      border-color: #00f2fe;
+      box-shadow: 0 0 0 2px rgba(0, 242, 254, 0.2);
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #12151c; }
+    ::-webkit-scrollbar-thumb { background: #2e3445; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #00f2fe; }
+
+    /* Dark Map Tiles Override */
+    .leaflet-container {
+      background: #141720 !important;
+      border-radius: 0.5rem;
+    }
+    .leaflet-popup-content-wrapper, .leaflet-popup-tip {
+      background: #1e222d !important;
+      color: #f8fafc !important;
+      border: 1px solid #00f2fe !important;
+      font-family: 'Inter', sans-serif !important;
+    }
+  </style>
+</head>
+
+<body class="theme-standard min-h-screen flex flex-col antialiased selection:bg-cyanAccent selection:text-black">
+
+  <!-- TOP APP HEADER -->
+  <header class="sticky top-0 z-40 bg-appbg/95 backdrop-blur border-b border-panelBorder px-4 py-3">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
+      
+      <!-- Logo & Title -->
+      <div class="flex items-center space-x-3">
+        <div class="w-9 h-9 rounded-lg bg-panel border border-cyanAccent/40 flex items-center justify-center text-cyanAccent text-lg font-bold">
+          <i class="fa-solid fa-robot"></i>
+        </div>
+        <div>
+          <h1 class="font-bold text-lg text-slate-100 flex items-center gap-2">
+            PROJECT <span class="text-cyanAccent font-mono">JARVIS</span>
+            <span class="text-[10px] px-2 py-0.5 rounded bg-cyanAccent/10 text-cyanAccent border border-cyanAccent/30 font-mono">DAILY v5.0</span>
+          </h1>
+          <p class="text-xs text-slateText font-mono">Personal Daily Operations & Assistant Center</p>
+        </div>
+      </div>
+
+      <!-- Real Hardware Indicators (Header Summary) -->
+      <div class="hidden lg:flex items-center space-x-6 text-xs font-mono">
+        <!-- Battery Status -->
+        <div class="flex items-center space-x-2">
+          <i id="hdr-batt-icon" class="fa-solid fa-battery-half text-amberAccent"></i>
+          <span class="text-slateText">BATTERY:</span>
+          <span id="hdr-batt-val" class="text-slate-200 font-bold">Checking...</span>
+        </div>
+
+        <!-- Connection Status -->
+        <div class="flex items-center space-x-2">
+          <span id="hdr-net-dot" class="w-2 h-2 rounded-full bg-emeraldAccent"></span>
+          <span class="text-slateText">NET:</span>
+          <span id="hdr-net-val" class="text-slate-200 font-bold">ONLINE</span>
+        </div>
+
+        <!-- Live 12-Hour Clock -->
+        <div class="flex items-center space-x-2">
+          <i class="fa-regular fa-clock text-cyanAccent"></i>
+          <span id="hdr-clock-val" class="text-cyanAccent font-bold">--:--:-- --</span>
+        </div>
+      </div>
+
+      <!-- Lighting Profile Controls -->
+      <div class="flex items-center space-x-2">
+        <div class="bg-panel p-1 rounded-lg border border-panelBorder flex text-xs font-mono">
+          <button onclick="setLighting('theme-low-glow')" id="btn-low" class="px-2.5 py-1 rounded text-slateText hover:text-slate-200 transition">Dim</button>
+          <button onclick="setLighting('theme-standard')" id="btn-std" class="px-2.5 py-1 rounded text-cyanAccent bg-appbg font-bold border border-cyanAccent/30 transition">Standard</button>
+          <button onclick="setLighting('theme-stark-glow')" id="btn-stark" class="px-2.5 py-1 rounded text-slateText hover:text-slate-200 transition">Stark</button>
+        </div>
+        <button onclick="switchTab('emergency')" class="px-3 py-1.5 rounded-lg bg-rubyAccent/20 hover:bg-rubyAccent/30 border border-rubyAccent/40 text-rubyAccent font-mono text-xs font-bold transition flex items-center gap-1.5">
+          <i class="fa-solid fa-phone"></i>
+          <span>Emergency Desk</span>
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- NAVIGATION TABS -->
+  <nav class="bg-appbg border-b border-panelBorder px-4 py-2 sticky top-[61px] z-30 overflow-x-auto">
+    <div class="max-w-7xl mx-auto flex space-x-1 min-w-max font-mono text-xs">
+      <button onclick="switchTab('dashboard')" id="tab-dashboard" class="tab-btn active px-4 py-2 rounded-lg bg-cyanAccent/10 border border-cyanAccent/40 text-cyanAccent font-bold flex items-center gap-2">
+        <i class="fa-solid fa-house"></i> Command Home
+      </button>
+      <button onclick="switchTab('location-map')" id="tab-location-map" class="tab-btn px-4 py-2 rounded-lg hover:bg-panel border border-transparent text-slateText hover:text-slate-200 flex items-center gap-2">
+        <i class="fa-solid fa-map-location-dot"></i> Maps & Places
+      </button>
+      <button onclick="switchTab('world-clock')" id="tab-world-clock" class="tab-btn px-4 py-2 rounded-lg hover:bg-panel border border-transparent text-slateText hover:text-slate-200 flex items-center gap-2">
+        <i class="fa-solid fa-globe"></i> Show Time
+      </button>
+      <button onclick="switchTab('tech-panel')" id="tab-tech-panel" class="tab-btn px-4 py-2 rounded-lg hover:bg-panel border border-transparent text-slateText hover:text-slate-200 flex items-center gap-2">
+        <i class="fa-solid fa-microchip"></i> Personal Tech Panel
+      </button>
+      <button onclick="switchTab('memory-vault')" id="tab-memory-vault" class="tab-btn px-4 py-2 rounded-lg hover:bg-panel border border-transparent text-slateText hover:text-slate-200 flex items-center gap-2">
+        <i class="fa-solid fa-database"></i> Memory Vault
+      </button>
+      <button onclick="switchTab('missions')" id="tab-missions" class="tab-btn px-4 py-2 rounded-lg hover:bg-panel border border-transparent text-slateText hover:text-slate-200 flex items-center gap-2">
+        <i class="fa-solid fa-check-double"></i> Missions
+      </button>
+      <button onclick="switchTab('travel-desk')" id="tab-travel-desk" class="tab-btn px-4 py-2 rounded-lg hover:bg-panel border border-transparent text-slateText hover:text-slate-200 flex items-center gap-2">
+        <i class="fa-solid fa-plane-departure"></i> Travel Brief
+      </button>
+      <button onclick="switchTab('emergency')" id="tab-emergency" class="tab-btn px-4 py-2 rounded-lg hover:bg-panel border border-transparent text-slateText hover:text-slate-200 flex items-center gap-2">
+        <i class="fa-solid fa-shield-cat"></i> Emergency Desk
+      </button>
+    </div>
+  </nav>
+
+  <!-- MAIN APPLICATION CONTENT -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6">
+
+    <!-- VIEW 1: COMMAND HOME / NATURAL LANGUAGE CENTER -->
+    <div id="view-dashboard" class="tab-view space-y-6">
+      
+      <!-- Natural Language Command Box -->
+      <div class="jarvis-panel p-6 border-cyanAccent/30 relative">
+        <div class="flex flex-col space-y-4">
+          <div class="flex items-center justify-between">
+            <h2 class="font-bold text-base text-slate-100 flex items-center gap-2">
+              <i class="fa-solid fa-terminal text-cyanAccent"></i> NATURAL LANGUAGE COMMAND CENTER
+            </h2>
+            <span class="text-xs font-mono text-slateText">Type a question or command</span>
+          </div>
+
+          <!-- Command Input Row -->
+          <div class="flex items-center gap-2">
+            <div class="relative flex-1">
+              <input type="text" id="cmd-input" placeholder="e.g., 'What time is it in Tokyo', 'Find hospitals near me', 'Save note: Buy groceries', 'Add task: Review travel brief'" class="jarvis-input w-full px-4 py-3 text-sm pr-10" onkeypress="handleCmdKey(event)">
+              <button onclick="clearCmdInput()" class="absolute right-3 top-1/2 -translate-y-1/2 text-slateText hover:text-slate-200 text-xs">
+                <i class="fa-solid fa-xmark"></i>
+              </button>
+            </div>
+            <button onclick="executeCommand()" class="px-5 py-3 rounded-lg bg-cyanAccent hover:bg-cyan-400 text-black font-bold text-sm transition flex items-center gap-2 flex-shrink-0">
+              <i class="fa-solid fa-paper-plane"></i>
+              <span>EXECUTE</span>
+            </button>
+          </div>
+
+          <!-- Quick Suggestion Chips -->
+          <div class="flex flex-wrap items-center gap-2 pt-1 font-mono text-xs">
+            <span class="text-slateText text-[11px]">Quick Commands:</span>
+            <button onclick="runSuggestedCmd('What time is it in Tokyo?')" class="px-2.5 py-1 rounded bg-panelHover border border-panelBorder text-cyanAccent hover:bg-panel transition">
+              <i class="fa-solid fa-clock text-[10px]"></i> Time in Tokyo
+            </button>
+            <button onclick="runSuggestedCmd('Find hospitals near me')" class="px-2.5 py-1 rounded bg-panelHover border border-panelBorder text-emeraldAccent hover:bg-panel transition">
+              <i class="fa-solid fa-hospital text-[10px]"></i> Find Hospitals
+            </button>
+            <button onclick="runSuggestedCmd('Show my saved notes')" class="px-2.5 py-1 rounded bg-panelHover border border-panelBorder text-amberAccent hover:bg-panel transition">
+              <i class="fa-solid fa-folder-open text-[10px]"></i> Saved Notes
+            </button>
+            <button onclick="runSuggestedCmd('Create travel brief for Kochi')" class="px-2.5 py-1 rounded bg-panelHover border border-panelBorder text-slate-300 hover:bg-panel transition">
+              <i class="fa-solid fa-plane text-[10px]"></i> Brief Kochi
+            </button>
+          </div>
+
+          <!-- Command Result Response Output Box -->
+          <div id="cmd-result-box" class="hidden mt-3 p-4 rounded-lg bg-appbg border border-cyanAccent/40 font-mono text-xs text-cyan-200">
+            <div class="flex justify-between items-start mb-1.5">
+              <span class="text-amberAccent font-bold flex items-center gap-1">
+                <i class="fa-solid fa-circle-check"></i> JARVIS ACTION RESPONSE:
+              </span>
+              <button onclick="document.getElementById('cmd-result-box').classList.add('hidden')" class="text-slateText hover:text-slate-200">
+                <i class="fa-solid fa-xmark"></i>
+              </button>
+            </div>
+            <div id="cmd-result-text" class="leading-relaxed">Awaiting input...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Overview Status Cards Grid -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        
+        <!-- Local Time Card -->
+        <div class="jarvis-panel p-4 flex items-center justify-between">
+          <div>
+            <p class="text-xs font-mono text-slateText">LOCAL TIME</p>
+            <p id="dash-clock-time" class="text-lg font-bold text-cyanAccent mt-1">--:--:-- --</p>
+            <p id="dash-clock-date" class="text-[11px] font-mono text-slateText mt-0.5">Fetching date...</p>
+          </div>
+          <div class="w-10 h-10 rounded-lg bg-cyanAccent/10 border border-cyanAccent/30 flex items-center justify-center text-cyanAccent text-lg">
+            <i class="fa-regular fa-clock"></i>
+          </div>
+        </div>
+
+        <!-- Real Battery Card -->
+        <div class="jarvis-panel p-4 flex items-center justify-between">
+          <div>
+            <p class="text-xs font-mono text-slateText">REAL BATTERY</p>
+            <p id="dash-batt-level" class="text-lg font-bold text-emeraldAccent mt-1">-- %</p>
+            <p id="dash-batt-state" class="text-[11px] font-mono text-slateText mt-0.5">Status loading...</p>
+          </div>
+          <div class="w-10 h-10 rounded-lg bg-emeraldAccent/10 border border-emeraldAccent/30 flex items-center justify-center text-emeraldAccent text-lg">
+            <i id="dash-batt-icon" class="fa-solid fa-battery-full"></i>
+          </div>
+        </div>
+
+        <!-- Active Location Card -->
+        <div class="jarvis-panel p-4 flex items-center justify-between">
+          <div>
+            <p class="text-xs font-mono text-slateText">ACTIVE LOCATION</p>
+            <p id="dash-location-name" class="text-sm font-bold text-slate-100 mt-1 truncate max-w-[150px]">Aluva, Kerala</p>
+            <p id="dash-location-coords" class="text-[11px] font-mono text-slateText mt-0.5">10.1076° N, 76.3516° E</p>
+          </div>
+          <div class="w-10 h-10 rounded-lg bg-amberAccent/10 border border-amberAccent/30 flex items-center justify-center text-amberAccent text-lg">
+            <i class="fa-solid fa-location-dot"></i>
+          </div>
+        </div>
+
+        <!-- Pending Tasks Card -->
+        <div class="jarvis-panel p-4 flex items-center justify-between">
+          <div>
+            <p class="text-xs font-mono text-slateText">PENDING MISSIONS</p>
+            <p id="dash-task-count" class="text-lg font-bold text-rubyAccent mt-1">0 Tasks</p>
+            <p class="text-[11px] font-mono text-slateText mt-0.5">Daily objectives</p>
+          </div>
+          <div class="w-10 h-10 rounded-lg bg-rubyAccent/10 border border-rubyAccent/30 flex items-center justify-center text-rubyAccent text-lg">
+            <i class="fa-solid fa-list-check"></i>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Quick Maps & Quick Notes Dual Row -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Interactive Map Preview -->
+        <div class="lg:col-span-2 jarvis-panel p-5 flex flex-col justify-between">
+          <div class="flex justify-between items-center mb-3">
+            <h3 class="text-sm font-bold text-slate-200 flex items-center gap-2">
+              <i class="fa-solid fa-map text-cyanAccent"></i> LOCAL GEOSPATIAL MAP (ALUVA)
+            </h3>
+            <button onclick="switchTab('location-map')" class="text-xs font-mono text-cyanAccent hover:underline flex items-center gap-1">
+              <span>Full Screen Map</span> <i class="fa-solid fa-arrow-right"></i>
+            </button>
+          </div>
+          <div id="dash-mini-map" class="h-64 rounded-lg bg-appbg border border-panelBorder"></div>
+        </div>
+
+        <!-- Quick Memory Vault Feed -->
+        <div class="jarvis-panel p-5 flex flex-col">
+          <div class="flex justify-between items-center mb-3">
+            <h3 class="text-sm font-bold text-slate-200 flex items-center gap-2">
+              <i class="fa-solid fa-box-archive text-amberAccent"></i> RECENT NOTES
+            </h3>
+            <button onclick="switchTab('memory-vault')" class="text-xs font-mono text-amberAccent hover:underline">View All</button>
+          </div>
+          <div id="dash-recent-notes" class="flex-1 space-y-2 overflow-y-auto max-h-64 font-mono text-xs">
+            <!-- Dynamic note items rendered here -->
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- VIEW 2: LOCATION INTELLIGENCE & GOOGLE MAPS -->
+    <div id="view-location-map" class="tab-view space-y-6 hidden">
+      <div class="jarvis-panel p-6">
+        <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-4">
+          <div>
+            <h2 class="font-bold text-lg text-slate-100 flex items-center gap-2">
+              <i class="fa-solid fa-map-location-dot text-cyanAccent"></i> LOCATION INTELLIGENCE & MAPS
+            </h2>
+            <p class="text-xs text-slateText font-mono">Real-world map with direct Google Maps external navigation</p>
+          </div>
+
+          <!-- Location Search Bar -->
+          <div class="flex flex-wrap items-center gap-2 w-full lg:w-auto">
+            <input type="text" id="map-query-input" placeholder="Search city or address..." class="jarvis-input px-3 py-1.5 text-xs w-full sm:w-60">
+            <button onclick="searchLocationMap()" class="px-3 py-1.5 rounded bg-cyanAccent/20 border border-cyanAccent/40 text-cyanAccent hover:bg-cyanAccent/30 text-xs font-mono font-semibold transition">
+              <i class="fa-solid fa-magnifying-glass"></i> Search
+            </button>
+            <button onclick="requestBrowserGPS()" class="px-3 py-1.5 rounded bg-emeraldAccent/20 border border-emeraldAccent/40 text-emeraldAccent hover:bg-emeraldAccent/30 text-xs font-mono font-semibold transition flex items-center gap-1">
+              <i class="fa-solid fa-location-crosshairs"></i> Use GPS
+            </button>
+            <button onclick="resetToAluva()" class="px-3 py-1.5 rounded bg-amberAccent/20 border border-amberAccent/40 text-amberAccent hover:bg-amberAccent/30 text-xs font-mono font-semibold transition">
+              Reset Aluva
+            </button>
+          </div>
+        </div>
+
+        <!-- Quick Place Discovery Buttons -->
+        <div class="flex flex-wrap gap-2 mb-4 font-mono text-xs">
+          <span class="text-slateText text-xs self-center">Nearby Places:</span>
+          <button onclick="findNearbyCategory('hospital')" class="px-2.5 py-1 rounded bg-panelHover border border-panelBorder text-slate-300 hover:text-cyanAccent transition">
+            <i class="fa-solid fa-hospital-user text-rubyAccent"></i> Hospitals
+          </button>
+          <button onclick="findNearbyCategory('police')" class="px-2.5 py-1 rounded bg-panelHover border border-panelBorder text-slate-300 hover:text-cyanAccent transition">
+            <i class="fa-solid fa-shield-halved text-cyanAccent"></i> Police
+          </button>
+          <button onclick="findNearbyCategory('pharmacy')" class="px-2.5 py-1 rounded 
